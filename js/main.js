@@ -56,8 +56,16 @@ var App = {
                 $.each(response.sandwiches, function(key, value){
                     App.add_item(value);
                 });
-
-                App.reorder_items();
+            
+                
+                // organize items:
+                var $images = $('#items-box .thumbnails img'),
+                    images_total = $images.length,
+                    images_count = 0;
+            
+                $images.on('load', function(){
+                    if (++images_count === images_total) App.reorder_items();
+                });
             },
             complete: function() {
                 App.loading.hide();
