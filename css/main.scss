@@ -1,0 +1,46 @@
+/**
+ * @outputStyle compressed
+ */
+
+@mixin border-radius($border-width) {
+    -webkit-border-radius: $border-width;
+    -moz-border-radius: $border-width;
+    border-radius: $border-width;
+}
+
+#loading {
+    $width: 240px;
+    @include border-radius(3px);
+    
+    text-align: center;
+    z-index: 100;
+    position: fixed;
+    left: 50%;
+    top: 45px;
+    background-color: #000;
+    display: none;
+    opacity: 0.6;
+    color: #fff;
+    width: $width;
+    margin-left: -($width / 2);
+    
+    div {
+        margin: 13px;
+        
+        em {
+            display: block;
+        }
+    }
+}
+
+#add-item-win.modal {
+    .ingredient-box {
+        padding: 2px 0;
+    }
+}
+
+#items-box {
+    .price, .ingredients_count {
+        display: block;
+    }
+}
