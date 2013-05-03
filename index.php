@@ -134,7 +134,7 @@ if (isset($_POST['_todo']))
 }
 
 ?><!DOCTYPE html>
-<html lang="es">
+<html lang="es" manifest="cache.manifest">
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -146,8 +146,8 @@ if (isset($_POST['_todo']))
          
         <script src="js/jquery-1.9.1.min.js" type="text/javascript"></script>
         
-        <link href="js/bootstrap/css/bootstrap.css" rel="stylesheet" media="all" type="text/css" />
-        <link href="js/bootstrap/css/bootstrap-responsive.css" rel="stylesheet"  media="all" type="text/css" />
+        <link href="js/bootstrap/css/bootstrap.min.css" rel="stylesheet" media="all" type="text/css" />
+        <link href="js/bootstrap/css/bootstrap-responsive.min.css" rel="stylesheet"  media="all" type="text/css" />
         <script src="js/bootstrap/js/bootstrap.min.js" type="text/javascript"></script>
         
         <script src="js/jquery.masonry.min.js" type="text/javascript"></script>
