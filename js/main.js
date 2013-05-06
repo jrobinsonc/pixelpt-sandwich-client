@@ -5,12 +5,6 @@ var App = {
         $text: null,
 
         show: function(msg){
-
-            if (App.loading.$box === null) {
-                App.loading.$box = $('#loading');
-                App.loading.$text = App.loading.$box.children('div').children('em');
-            }
-
             App.loading.$box.show();
             App.loading.$text.text(msg);
         },
@@ -37,10 +31,10 @@ var App = {
         App.$items_box.masonry('reload');
 
     },
-    add_item: function(item) {
+    show_item: function(item) {
         App.$items_box.append(Mustache.render(App.item_tpl, item));
     },
-    load_items: function() {
+    download_items: function(callback) {
 
         $.ajax({
             type: 'POST',
@@ -52,20 +46,18 @@ var App = {
                 App.loading.show('Cargando sandwiches...');
             },
             success: function(response) {
-
-                $.each(response.sandwiches, function(key, value){
-                    App.add_item(value);
-                });
-            
                 
-                // organize items:
-                var $images = $('#items-box .thumbnails img'),
-                    images_total = $images.length,
-                    images_count = 0;
-            
-                $images.on('load', function(){
-                    if (++images_count === images_total) App.reorder_items();
-                });
+                callback(response.sandwiches);
+                
+                if ('storage' in App) {
+                    $.each(response.sandwiches, function(key, value){
+                        App.storage.save('sandwiches', value);
+                    });
+                    
+                    App.storage.save('settings', {title: "last_update", value: new Date().getTime()});
+                    App.storage.save('settings', {title: "total_sandwiches", value: response.sandwiches.length});
+                }
+                
             },
             complete: function() {
                 App.loading.hide();
@@ -75,8 +67,183 @@ var App = {
             }
         });
     },
+    load_items: function() {
+
+        if ('storage' in App) {
+            
+            App.loading.show('Cargando sandwiches...');
+            
+            $(window).on('indexedDB-ready', function(){
+                
+                var db = App.storage.db,
+                    trans = db.transaction(['sandwiches', 'settings'], 'readwrite'),
+                    os_settings = trans.objectStore('settings'),
+                    os_settines_var = {};
+                
+                os_settings.get("last_update").onsuccess = function(event) {
+                    var result = event.target.result;
+
+                    if (!!result === false) {
+                        App.download_items(function(items){
+                            App.show_items(items);
+                        });
+                        
+                        return;
+                    }
+                    
+                    os_settines_var.last_update = result.value;
+                    
+                    if (os_settines_var.last_update < (new Date().getTime() - 300000)) {
+                        App.download_items(function(items){
+                            App.show_items(items);
+                        });
+                        
+                        return;
+                    }
+                    
+                    os_settings.get("total_sandwiches").onsuccess = function(event) {
+                        var result = event.target.result;
+
+                        if (!!result === false) {
+                            App.download_items(function(items){
+                                App.show_items(items);
+                            });
+
+                            return;
+                        }
+                        
+                        os_settines_var.total_sandwiches = result.value;
+
+                        
+                        var os_sandwiches = trans.objectStore('sandwiches'),
+                            os_sandwiches_cr = os_sandwiches.openCursor(IDBKeyRange.lowerBound(0)),
+                            total_items = [],
+                            total_items_listed = 0;
+
+                        os_sandwiches_cr.onsuccess = function(event) {
+                            var result = event.target.result;
+
+                            if (!!result === false) {
+                                return;
+                            }
+                            
+                            total_items.push(result.value);
+
+                            result.continue();
+                            
+                            total_items_listed++;
+                            
+                            if (total_items_listed === os_settines_var.total_sandwiches) {
+                                App.show_items(total_items);
+                                
+                                App.loading.hide();
+                            }
+                        };
+                        
+                    };
+                };
+                    
+                    
+            });
+            
+            return;
+        }
+        
+        App.download_items(function(items){
+            App.show_items(items);
+        });
+            
+    },
+    
+    show_items: function(items) {
+
+        $.each(items, function(key, value){
+            App.show_item(value);
+        });
+
+        // organize items:
+        var $images = $('#items-box .thumbnails img'),
+            images_total = $images.length,
+            images_count = 0;
+
+        $images.on('load', function(){
+            if (++images_count === images_total) App.reorder_items();
+        });
+    },
 
     init: function(){
+
+        if ('indexedDB' in window) {
+            App.storage = {
+                db: null,
+                        
+                records: {},
+                
+                init: function() {
+            
+                    var request = indexedDB.open('pixelpt', 1);
+                    
+                    request.onupgradeneeded = function(event) {
+                        var db = event.target.result;
+
+
+                        if (db.objectStoreNames.contains('sandwiches')) {
+                            db.deleteObjectStore('sandwiches');
+                        }
+                        
+                        db.createObjectStore('sandwiches', {keyPath: 'id'});
+                        
+                        if (db.objectStoreNames.contains('settings')) {
+                            db.deleteObjectStore('settings');
+                        }
+
+                        db.createObjectStore('settings', {keyPath: 'title'});
+                    };
+                    
+                    request.onsuccess = function(e) {
+                        App.storage.db = e.target.result;
+                        
+                        
+                        for (os_name in App.storage.records) {
+                            for (row in App.storage.records[os_name]) {
+                                App.storage.save(os_name, App.storage.records[os_name][row]);
+                            }
+                        }
+                        
+                        
+                        $(window).trigger('indexedDB-ready');
+                    };
+                },
+                        
+                save: function(os_name, value) {
+            
+                    var db = App.storage.db;
+                    
+                    if (db === null) {
+                        
+                        if (os_name in App.storage.records === false) {
+                            App.storage.records[os_name] = [];
+                        }
+                        
+                        App.storage.records[os_name].push(value);
+                        
+                    } else {
+                        
+                        var trans = db.transaction([os_name], 'readwrite'),
+                            object_store = trans.objectStore(os_name);
+
+                        object_store.put(value);
+                    }
+                }
+            };
+            
+            App.storage.init();
+        }
+        
+        
+        App.loading.$box = $('#loading');
+        App.loading.$text = App.loading.$box.children('div').children('em');
+        
 
         App.$items_box = $('#items-box ul');
         App.item_tpl = $('#item-box-tpl').html();
@@ -157,8 +324,12 @@ var App = {
             
                     switch (response.result) {
                         case 'OK':
-                            App.add_item(response.sandwich);
+                            App.show_item(response.sandwich);
                             App.reorder_items();
+                            
+                            if ('storage' in App) {
+                                App.storage.save('sandwiches', response.sandwich);
+                            }
                             
                             $add_item_form.trigger('show-msg', ['success', 'Listo!', 'El sandwich fue creado.']);
                             $add_item_form.trigger('clear-inputs');

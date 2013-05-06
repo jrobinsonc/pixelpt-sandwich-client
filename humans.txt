@@ -1,13 +1,14 @@
 /* TEAM */
 	Developer:              Jose Robinson
-	Contact:                www.joserobinson.com
+	Contact:                http://www.joserobinson.com
 	Twitter:                @jrobinsonc
+	Github:                 https://github.com/jrobinsonc
 	From:                   Santo Domingo, República Dominicana
 
 
 /* SITE */
-	Last update:            2013/05/03
+	Last update:            2013/05/06
 	Language:               Spanish
-	Technologies:           HTML5, PHP, Sass, Bootstrap, jQuery, jQuery Masonry, mustache.js
+	Technologies:           HTML5, PHP, Sass, Bootstrap, jQuery, Application Cache, IndexedDB, and more
 	Layout type:            Responsive
 	Software:               Netbeans, Fireworks
