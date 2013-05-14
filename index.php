@@ -7,7 +7,7 @@ if (isset($_POST['_todo']))
 {
     $api_url = 'http://pixelpt-sandwich-api.herokuapp.com';
     
-    if (in_array($_POST['_todo'], array('sandwiches')))
+    if (in_array($_POST['_todo'], array('sandwiches', 'ingredients')))
     {
         if (($raw_data = file_get_contents("{$api_url}/{$_POST['_todo']}")) === FALSE)
             exit('ERROR#' . __LINE__);
@@ -128,6 +128,15 @@ if (isset($_POST['_todo']))
             echo $raw_data;
 
             break;
+        
+        case 'ingredients':
+            
+            if (!isset($parsed_data->ingredients))
+                exit('ERROR#' . __LINE__);
+
+            echo $raw_data;
+
+            break;
     }
     
     exit;
@@ -232,8 +241,8 @@ if (isset($_POST['_todo']))
         
         <script id="ingredient-box-tpl" type="text/template">
             <div class="ingredient-box">
-                <input type="text" name="ingredient_name_{{num}}" class="input-medium" required> 
-                <input type="number" name="ingredient_qty_{{num}}" class="input-mini" required>
+                <input type="text" name="ingredient_name_{{num}}" class="input-medium ingredient-name" autocomplete="off" required> 
+                <input type="number" name="ingredient_qty_{{num}}" class="input-mini" value="0" min="1" required>
                 <a class="btn delete-ingredient-btn" href="#"><i class="icon-minus"></i></a>
             </div>
         </script>

@@ -1,4 +1,6 @@
 var App = {
+    
+    cache_expiration: 60000, // milisegundos
 
     loading: {
         $box: null,
@@ -34,8 +36,9 @@ var App = {
     show_item: function(item) {
         App.$items_box.append(Mustache.render(App.item_tpl, item));
     },
-    download_items: function(callback) {
-
+    download_items: function(callback, download) {
+        download = download || false;
+        
         $.ajax({
             type: 'POST',
             dataType: 'json',
@@ -47,25 +50,118 @@ var App = {
             },
             success: function(response) {
                 
-                callback(response.sandwiches);
-                
+                var finish = function(sandwiches) {
+                    callback(sandwiches);
+                        
+                    App.loading.hide();
+                };
+        
+                if (App.ingredients_list.length === 0) {
+                    
+                    App.load_ingredients(function(){
+                        finish(response.sandwiches);
+                    }, download);
+                    
+                } else {
+                    finish(response.sandwiches);
+                }
+        
                 if ('storage' in App) {
                     $.each(response.sandwiches, function(key, value){
                         App.storage.save('sandwiches', value);
                     });
                     
                     App.storage.save('settings', {title: "last_update", value: new Date().getTime()});
-                    App.storage.save('settings', {title: "total_sandwiches", value: response.sandwiches.length});
                 }
                 
             },
             complete: function() {
-                App.loading.hide();
             },
             error: function() {
                 App.system_error();
             }
         });
+    },
+    ingredients_list: [],
+    download_ingredients: function(callback) {
+
+        $.ajax({
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                _todo: 'ingredients'
+            },
+            beforeSend: function() {
+            },
+            success: function(response) {
+                
+                if ('storage' in App) {
+                    $.each(response.ingredients, function(key, value){
+                        App.storage.save('ingredients', value);
+                    });                    
+                }
+                
+                callback();
+            },
+            complete: function() {
+            },
+            error: function() {
+                App.system_error();
+            }
+        });
+    },
+    load_ingredients: function(callback, download) {
+        download = download || false;
+        
+        var db = App.storage.db,
+        total_ingredients_count = 0,
+        trans = db.transaction(['ingredients'], 'readwrite'),
+        os_ingredients = trans.objectStore('ingredients');
+        
+        if (download === true) {
+            
+            App.download_ingredients(function() {
+                App.load_ingredients(callback);
+            });
+            
+        } else {
+            
+            os_ingredients.count().onsuccess = function(e) {
+                total_ingredients_count = e.target.result;
+
+                if (total_ingredients_count === 0) {
+
+                    App.download_ingredients(function() {
+                        App.load_ingredients(callback);
+                    });
+
+                } else {
+
+                    var total_ingredients_listed = 0;
+
+                    os_ingredients.openCursor(IDBKeyRange.lowerBound(0)).onsuccess = function(event) {
+                        var result = event.target.result;
+
+                        if (!!result === false) {
+                            return;
+                        }
+
+                        if (App.ingredients_list.indexOf(result.value.name) === -1) {
+                            App.ingredients_list.push(result.value.name);
+                        }
+
+                        result.continue();
+
+                        total_ingredients_listed++;
+
+                        if (total_ingredients_listed === total_ingredients_count) {
+                            callback();
+                        }
+                    };
+                }
+            };
+        }
+        
     },
     load_items: function() {
 
@@ -78,6 +174,7 @@ var App = {
                 var db = App.storage.db,
                     trans = db.transaction(['sandwiches', 'settings'], 'readwrite'),
                     os_settings = trans.objectStore('settings'),
+                    os_sandwiches = trans.objectStore('sandwiches'),
                     os_settines_var = {};
                 
                 os_settings.get("last_update").onsuccess = function(event) {
@@ -93,27 +190,24 @@ var App = {
                     
                     os_settines_var.last_update = result.value;
                     
-                    if (os_settines_var.last_update < (new Date().getTime() - 300000)) {
+                    if (os_settines_var.last_update < (new Date().getTime() - App.cache_expiration)) {
                         App.download_items(function(items){
                             App.show_items(items);
-                        });
+                        }, true);
                         
                         return;
                     }
                     
-                    os_settings.get("total_sandwiches").onsuccess = function(event) {
-                        var result = event.target.result;
-
-                        if (!!result === false) {
+                    os_sandwiches.count().onsuccess = function(event) {
+                        os_settines_var.total_sandwiches = event.target.result;
+                        
+                        if (os_settines_var.total_sandwiches === 0) {
                             App.download_items(function(items){
                                 App.show_items(items);
                             });
 
                             return;
                         }
-                        
-                        os_settines_var.total_sandwiches = result.value;
-
                         
                         var os_sandwiches = trans.objectStore('sandwiches'),
                             os_sandwiches_cr = os_sandwiches.openCursor(IDBKeyRange.lowerBound(0)),
@@ -136,13 +230,14 @@ var App = {
                             if (total_items_listed === os_settines_var.total_sandwiches) {
                                 App.show_items(total_items);
                                 
-                                App.loading.hide();
+                                App.load_ingredients(function(){
+                                    App.loading.hide();
+                                });
                             }
                         };
-                        
                     };
-                };
                     
+                };
                     
             });
             
@@ -181,18 +276,26 @@ var App = {
                 
                 init: function() {
             
-                    var request = indexedDB.open('pixelpt', 1);
+                    var request = indexedDB.open('pixelpt', 3);
                     
                     request.onupgradeneeded = function(event) {
                         var db = event.target.result;
 
-
+                        // sandwiches
                         if (db.objectStoreNames.contains('sandwiches')) {
                             db.deleteObjectStore('sandwiches');
                         }
                         
                         db.createObjectStore('sandwiches', {keyPath: 'id'});
                         
+                        // ingredients
+                        if (db.objectStoreNames.contains('ingredients')) {
+                            db.deleteObjectStore('ingredients');
+                        }
+                        
+                        db.createObjectStore('ingredients', {keyPath: 'id'});
+                        
+                        // settings
                         if (db.objectStoreNames.contains('settings')) {
                             db.deleteObjectStore('settings');
                         }
@@ -211,7 +314,8 @@ var App = {
                         }
                         
                         
-                        $(window).trigger('indexedDB-ready');
+                        $(window).trigger('indexedDB-ready')
+                        .data('indexedDB-ready', true);
                     };
                 },
                         
@@ -269,9 +373,16 @@ var App = {
             
             var data = {
                 num: $add_ingredient_btn.siblings('div').length + 1
-            };
+            },
+            $new_row = $.parseHTML(Mustache.render(ingredient_box_tpl, data)),
+            $ingredient_name_input = $($new_row[1]).children('.ingredient-name');
             
-            $add_ingredient_btn.parent().append(Mustache.render(ingredient_box_tpl, data));
+            $ingredient_name_input.typeahead({
+                items: 2,
+                source: App.ingredients_list
+            });
+            
+            $add_ingredient_btn.parent().append($new_row);
             
             $ingredients_qty_input.val(data.num);
         });
