@@ -12,6 +12,8 @@ Tested on:
 * Mozilla Firefox 20
 * Internet Explorer 10
 
+Some tags: responsive layout, IndexedDB, Application Cache, HTML5, PHP, Sass, Bootstrap, jQuery.
+
 ## Demo
 
 This app is running on heroku:  
