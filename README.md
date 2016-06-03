@@ -3,6 +3,8 @@
 Client for the Pixel Perfect Tree Sandwich API:  
 https://gist.github.com/gotjosh/8bc915419ac046cf0d68
 
+> NOTE: The [API](http://pixelpt-sandwich-api.herokuapp.com/) is not working.
+
 ## About
 
 For development specifications: [humans.txt](https://github.com/jrobinsonc/pixelpt-sandwich-client/blob/master/humans.txt).
